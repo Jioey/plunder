@@ -28,15 +28,15 @@ void readData(string file, Trajectory& traj){
     istringstream iss_header (res);
     string comma;
 
-    map<string, int> inds;
+    map<string, int> inds; // indicies (?)
     string cur_var;
     int count = 0;
     while(getline(iss_header, cur_var, ',')) {
         trim(cur_var);
-        if(cur_var.substr(0, 3) == "LA.")
+        if(cur_var.substr(0, 3) == "LA.") // removes LA prefix if exists
             cur_var = cur_var.substr(3);
 
-        inds[cur_var] = count;
+        inds[cur_var] = count; // --> inds = {(variable_name, id),...}
         count++;
     }
 
@@ -45,18 +45,21 @@ void readData(string file, Trajectory& traj){
     while(getline(infile, res)){
         istringstream iss (res);
 
+        // reads line into vals as doubles
         vector<double> vals;
         for(int i = 0; i < count; i++){
-            double d; iss >> d >> comma;
+            double d; 
+            iss >> d >> comma;
             vals.push_back(d);
         }
 
+        // state creation
         State state;
         for(Var each: Obs_vars) {
             state.put(each.name_, vals[inds[each.name_]]);
         }
 
-        if(inds.count("HA") > 0) {
+        if(inds.count("HA") > 0) { // if HA exists, set it in state
             state.set_ha(vals[inds["HA"]]);
         }
 
@@ -82,10 +85,17 @@ void writeData(string file, vector<vector<HA>>& trajectories){
     outFile.close();
 }
 
-
 // ----- Particle Filter ---------------------------------------------
-
-// Full trajectory generation with particle filter
+/** 
+ * @brief Full trajectory generation with particle filter
+ * 
+ * @param trajectories out-param; The list storing post-filter trajectories (a list of action labels) 
+ * @param N Number of particles to run the filter with
+ * @param M Number of trajectories
+ * @param traj The trajectory to input to the particle filter
+ * @param asp Current synthesized ASP policy
+ * @return double 
+ */
 double runFilter(vector<vector<HA>>& trajectories, int N, int M, Trajectory& traj, asp* asp){
 
     // Initialization
@@ -104,17 +114,28 @@ double runFilter(vector<vector<HA>>& trajectories, int N, int M, Trajectory& tra
     return obs_likelihood;
 }
 
-// Read input, run filter, write output
+/**
+ * @brief Read input, run filter, write output
+ * 
+ * @param trajectories out param; A list of action labels based on the trajectories after the filter; initially is empty
+ * @param N Number of particles to run the filter with
+ * @param M Sample size (defined in settings.txt)
+ * @param inputFile Path and name of the demonstration file, only read if @param traj is empty (应该是redundant的)
+ * @param outputFile Path and name of the training trajectory output files 
+ * @param traj Trajectory to process 
+ * @param asp Current synthesized ASP policy
+ * @return double 
+ */
 double filterFromFile(vector<vector<HA>>& trajectories, int N, int M, string inputFile, string outputFile, Trajectory traj, asp* asp){
-    // Read input
+    // Read input if traj is empty
     if(traj.size() == 0){
         readData(inputFile, traj);
     }
 
     double obs_likelihood = runFilter(trajectories, N, M, traj, asp);
 
-    // Write results
-    writeData(outputFile, trajectories);
+    // Write results (filter与sample完的action labels)
+    writeData(outputFile, trajectories); 
 
     return obs_likelihood;
 }

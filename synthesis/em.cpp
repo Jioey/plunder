@@ -20,28 +20,42 @@ namespace std {
     ostream& operator<<(ostream& os, const AST::ast_ptr& ast);
 }
 
-// Convert transition to EMDIPS-compatible Example
+/**
+ * @brief Convert transition to EMDIPS-compatible Example
+ * 
+ * @param ha Action label
+ * @param state State's observations
+ * @return Example 
+ */
 Example dataToExample(HA ha, Obs state){
     Example ex;
 
+    // for each of the observation variables
     for(Var each: Obs_vars) {
+        // if variable is a root 
         if(each.root_) {
-            ex.symbol_table_[each.name_] = SymEntry((float) state.get(each.name_));
+            ex.symbol_table_[each.name_] = SymEntry((float) state.get(each.name_)); // add variable to example's symbol table with its value and type NUM (see definition in pips/src/ast.cpp)
         }
     }
 
-    ex.start_ = SymEntry(print(ha));
+    // adds action label name to the Example object as start_, with type STATE
+    // (print(HA) is defined in utils.h, returns the string name of the action label)
+    ex.start_ = SymEntry(print(ha)); 
 
-    return ex;
+    return ex; // returns the Example object
 }
 
 bool use_error = true;
 // Runs EMDIPS-generated ASP
 HA emdipsASP(State state){
     HA prev_ha = state.ha;
-    Example obsObject = dataToExample(state.ha, state.obs);
+    Example obsObject = dataToExample(state.ha, state.obs); // converts input to Example data type
+
+    // for the number of transitions (defined initially)
     for(uint i = 0; i < transitions.size(); i++){
+        // when transitions[i] is relavent (i.e. prev_ha is the first of a transition and the transition is to another state)
         if(print(prev_ha) == transitions[i].first && transitions[i].first!=transitions[i].second){
+            // makes transition if ASP returns true for the observation
             if(InterpretBool(solution_preds[i], obsObject)) {
                 state.ha = to_label(transitions[i].second);
                 break;
@@ -105,27 +119,39 @@ void print_metrics(double cum_log_obs, double ha_correct, double t_total, DATATY
     }
 }
 
+/**
+ * @brief 
+ * 
+ * @param traj Current trajectory
+ * @param asp Current ASP policy
+ * @param output_path File path to save output data 
+ * @param ha_correct out param
+ * @param ha_total out param
+ * @return double, log_obs_cum: 
+ */
 double save_pure(Trajectory traj, asp* asp, string output_path, double& ha_correct, double& ha_total) {    
     ofstream outFile;
     outFile.open(output_path + ".csv");
 
+    // creates a list of files, one for each lower action (i.e. variables the agent controls)
     map<string, shared_ptr<ofstream>> la_files;
     for(string each: LA_vars) {
         la_files[each] = make_shared<ofstream>(output_path + "-" + each + ".csv");
     }
 
-    Trajectory gt = traj;
+    Trajectory gt = traj; // save current trajectory as a ground truth
     double log_obs_cum = 0;
 
     use_error = false;
 
     for(uint32_t n = 0; n < SAMPLE_SIZE; n++){
         log_obs_cum += execute_pure(traj, asp);
+        // -> traj updated using the newly synthesized policy
 
         for(int t = 0; t < traj.size() - 1; t++){
             ha_total++;
             if(traj.get(t+1).ha == gt.get(t+1).ha){
-                ha_correct++;
+                ha_correct++; // calculate new policy's accuracy
             }
 
             State last = (t == 0) ? State () : traj.get(t-1);
@@ -137,7 +163,7 @@ double save_pure(Trajectory traj, asp* asp, string output_path, double& ha_corre
             for(string each: LA_vars) {
                 (*la_files[each]) << la.get(each) << ",";
             }
-        }
+        } //// 
 
         Obs la = motorModel(traj.get(traj.size()-1), false);
         for(string each: LA_vars) {
@@ -157,6 +183,14 @@ double save_pure(Trajectory traj, asp* asp, string output_path, double& ha_corre
 }
 
 // Expectation step
+/**
+ * @brief Runs particle filter with asp and converts all states to the AST data type Example （不是我怎么感觉跟理论中的expectation没啥关系呢？？）
+ * 
+ * @param iteration Current iteration of the EM loop
+ * @param state_traj List of Trajectories read from demonstrations; one file translates to one trajectory
+ * @param asp Current ASP policy
+ * @return vector<vector<Example>> 
+ */
 vector<vector<Example>> expectation(uint iteration, vector<Trajectory>& state_traj, asp* asp){
 
     vector<vector<Example>> examples;
@@ -166,29 +200,36 @@ vector<vector<Example>> expectation(uint iteration, vector<Trajectory>& state_tr
 
     double cum_log_obs = 0;
     double ha_total = 0, ha_correct = 0;
+    // for first 10 (defined as TRAINING_SET) demonstrations
     for(uint i = 0; i < TRAINING_SET; i++){
         string in = SIM_DATA + to_string(i) + ".csv";
-        string out = TRAINING_TRAJ + to_string(iteration) + "-" + to_string(i) + ".csv";
+        string out = TRAINING_TRAJ + to_string(iteration) + "-" + to_string(i) + ".csv"; // outputs to "iter#-#.csv" (replacing # with a number)
         examples.push_back(vector<Example>());
 
-        // Run filter
+        // 创造trajectories object  -- stores SAMPLE_SIZE number of trajectories after filtering, also written to out/training_traj folder per iteration
         vector<vector<HA>> trajectories;
         
+        // Run filter
+        // 调用particle filter (filtered again based on the latest asp)
+        // filter state_traj[i] 然后存入 trajectories
         cum_log_obs += filterFromFile(trajectories, NUM_PARTICLES, SAMPLE_SIZE, in, out, state_traj[i], asp);
 
+        // 随机排序trajectories
         shuffle(begin(trajectories), end(trajectories), default_random_engine {});
         
-        // Convert each particle trajectory point to EMDIPS-supported Example
-        for(uint n = 0; n < trajectories.size(); n++){
+        // Convert each particle trajectory point to EMDIPS-supported Example (好像只是把每个state的数据转换成了AST里用的数据结构)
+        for(uint n = 0; n < trajectories.size(); n++){ // for every traj in trajectories
             vector<HA> traj = trajectories[n];
             for(int t = 0; t < state_traj[i].size() - 1; t++){
-                Example ex = dataToExample(traj[t], state_traj[i].get(t+1).obs);
+                Example ex = dataToExample(traj[t], state_traj[i].get(t+1).obs); // 把filter后的每个trajectory与下一个time stamp的observation变成Example object (used for AST)
 
                 // Provide next high-level action
                 ex.result_ = SymEntry(print(traj[t+1]));
                 examples[i].push_back(ex);
 
                 ha_total++;
+
+                // ha_correct: matches between before vs after particle filter
                 if(traj[t+1] == state_traj[i].get(t+1).ha) {
                     ha_correct++;
                 }
@@ -198,10 +239,14 @@ vector<vector<Example>> expectation(uint iteration, vector<Trajectory>& state_tr
         cout << "*";
         cout.flush();
     }
-    print_metrics(cum_log_obs, ha_correct, ha_total, TRAINING);
+
+    // 以下都是print logs
+    cout << "\n"
+    print_metrics(cum_log_obs, ha_correct, ha_total, TRAINING); // cum_log_obs results from particle filter
     
-    ha_correct = ha_total = cum_log_obs = 0;
+    ha_correct = ha_total = cum_log_obs = 0; // resets the variables
     for(uint i = 0; i < VALIDATION_SET; i++){
+        // after 10 sets (defined in settings), print training metrics and reset variables again
         if(i == TRAINING_SET) {
             print_metrics(cum_log_obs, ha_correct, ha_total, TESTING);
             ha_correct = ha_total = cum_log_obs = 0;
@@ -212,7 +257,7 @@ vector<vector<Example>> expectation(uint iteration, vector<Trajectory>& state_tr
     }
     print_metrics(cum_log_obs, ha_correct, ha_total, VALIDATION);
 
-    return examples;
+    return examples; // return了Example的列表
 }
 
 void default_merge(vector<vector<Example>>& allExamples, vector<Example>& consolidated){
@@ -221,18 +266,22 @@ void default_merge(vector<vector<Example>>& allExamples, vector<Example>& consol
     }
 }
 
-// Maximization step
+/**
+ * @brief Maximization step
+ * 
+ * @param allExamples output from the expectation step, converted from trajectories
+ * @param iteration 
+ */
 void maximization(vector<vector<Example>>& allExamples, uint iteration){
     vector<Example> samples;
-    default_merge(allExamples, samples);
+    default_merge(allExamples, samples); // consolidates allExamples to a vector, instead of a vector of vectors
     
     // Setup output for ASPs and accuracies
     string aspFilePath = GEN_ASP + to_string(iteration) + "/";
     filesystem::create_directory(aspFilePath);
 
     vector<ast_ptr> inputs; vector<Signature> sigs;
-    vector<ast_ptr> ops = AST::RecEnumerate(roots, inputs, samples, library,
-                                        BASE_FEAT_DEPTH, &sigs);
+    vector<ast_ptr> ops = AST::RecEnumerate(roots, inputs, samples, library, BASE_FEAT_DEPTH, &sigs);
     if (iteration % STRUCT_CHANGE_FREQ != 0) {
         // Don't enumerate: only optimize current sketch
         ops.clear();
@@ -247,7 +296,7 @@ void maximization(vector<vector<Example>>& allExamples, uint iteration){
 
     // Run synthesis algorithm to optimize sketches
     if(synthesizer == EMDIPS) { // EMDIPS
-        emdipsL3(samples, transitions, solution_preds, loss, ops, aspFilePath, pFunc);
+        emdipsL3(samples, transitions, solution_preds, loss, ops, aspFilePath, pFunc); // 调用了pips/src/ast/synthesis.cpp里的ASP synthesis函数，根据当前的demonstrations合成了ASP
     } else { // LDIPS
         ldipsL3(samples, transitions, solution_preds, loss, ops, aspFilePath);
     }
@@ -264,13 +313,16 @@ void maximization(vector<vector<Example>>& allExamples, uint iteration){
     aspStrFile.close();
 }
 
-// Settings
+/** Settings
+ * @brief Pass in settings from settings.h and include.h, and sets valid transitions, etc
+ * 
+ */
 void setupLdips(){
     cout << "-------------Setup----------------" << endl;
 
     passSettings(PROG_ENUM, PROG_COMPLEXITY_LOSS_BASE, PROG_COMPLEXITY_LOSS, synth_setting == INCREMENTAL);
 
-    for(Var each: Obs_vars) {
+    for(Var each: Obs_vars) { // observation variables, defined in domain.h
         if(each.root_) {
             roots.push_back(make_shared<Var>(each));
         }
@@ -309,26 +361,32 @@ void setupLdips(){
     cout << endl;
 }
 
+/**
+ * @brief Read demonstrations from csv files and run particle filters on them
+ * 
+ * @param state_traj out param; Stores list of Trajectories read from demonstrations
+ */
 void read_demonstration(vector<Trajectory>& state_traj){
 
     cout << "\nReading demonstration and optionally running ground-truth ASP..." << endl;
 
-    for(int r = 0; r < VALIDATION_SET; r++){
-        string inputFile = SIM_DATA + to_string(r) + ".csv";
+    for(int r = 0; r < VALIDATION_SET; r++){ // VALIDATION_SET = 30, 一共30份demonstration数据
+        string inputFile = SIM_DATA + to_string(r) + ".csv"; // python-gen/data#.csv
         Trajectory traj;
-        readData(inputFile, traj);
+        readData(inputFile, traj); // 从csv读取并存储到Trajectory数据结构里（调用的particleFilter/pf_runner.h的函数）
 
-        state_traj.push_back(traj);
+        state_traj.push_back(traj); // 加到state_traj的列表里
     }
 
     double cum_log_obs = 0, ha_total = 0, ha_correct = 0;
+    // 只跑前10个data文档当training set（可在settings.h修改TRAINING_SET数量)
     for(uint i = 0; i < TRAINING_SET; i++){
         string in = SIM_DATA + to_string(i) + ".csv";
-        string out = TRAINING_TRAJ + "gt-" + to_string(i) + ".csv";
+        string out = TRAINING_TRAJ + "gt-" + to_string(i) + ".csv"; // outputs to "itergt-#.csv" (replacing # with a number); 这里gt应该指的是ground truth
 
         // Run filter
         vector<vector<HA>> trajectories;
-        cum_log_obs += filterFromFile(trajectories, NUM_PARTICLES, SAMPLE_SIZE, in, out, state_traj[i], ASP_model);
+        cum_log_obs += filterFromFile(trajectories, NUM_PARTICLES, SAMPLE_SIZE, in, out, state_traj[i], ASP_model); // ground truth的filter结果，写入了training_traj/itergt-#.csv，用了手写的ASP
 
         for(uint n = 0; n < trajectories.size(); n++){
             for(int t = 0; t < state_traj[i].size() - 1; t++){
@@ -340,22 +398,23 @@ void read_demonstration(vector<Trajectory>& state_traj){
         }
     }
 
+    // print training log
     print_metrics(cum_log_obs, ha_correct, ha_total, TRAINING);
     
     ha_correct = ha_total = cum_log_obs = 0;
     for(uint i = 0; i < VALIDATION_SET; i++){
         if(i == TRAINING_SET) {
-            print_metrics(cum_log_obs, ha_correct, ha_total, TESTING);
+            print_metrics(cum_log_obs, ha_correct, ha_total, TESTING); // print testing log
             ha_correct = ha_total = cum_log_obs = 0;
         }
         
         string plot = VALIDATION_TRAJ+"gt-"+to_string(i);
         cum_log_obs += save_pure(state_traj[i], ASP_model, plot, ha_correct, ha_total);
     }
-    print_metrics(cum_log_obs, ha_correct, ha_total, VALIDATION);
+    print_metrics(cum_log_obs, ha_correct, ha_total, VALIDATION); // print validation log
 }
 
-
+// 主算法
 void emLoop(){
 
     // Initialization

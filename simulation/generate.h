@@ -100,6 +100,13 @@ void write_traj(vector<Trajectory>& traj, string outputPath){
     }
 }
 
+/**
+ * @brief 
+ * 
+ * @param traj out param
+ * @param asp 
+ * @return double: observation liklihood
+ */
 double execute_pure(Trajectory& traj, asp* asp){
     double log_obs = 0;
 
@@ -113,8 +120,10 @@ double execute_pure(Trajectory& traj, asp* asp){
         traj.set(t, asp(State(last.ha, cur.obs)));
         cur.ha = traj.get(t).ha;
 
+        // calculates log probability of observation given hypothesized LA
         log_obs += obs_likelihood_given_model(cur, traj.get(t).obs, la_error_scaler);
     }
 
+    // returns sum from obs_likelihood_given_model
     return log_obs;
 }

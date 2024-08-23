@@ -124,6 +124,7 @@ public:
 
 // -----------------------------------------------------------------------------
 // ----- Trajectory ------------------------------------------------------------
+// A vector of States
 // -----------------------------------------------------------------------------
 struct Trajectory {
     vector<State> traj;
@@ -154,6 +155,7 @@ struct Trajectory {
         return traj.size();
     }
 
+    // prints out action label of every state in this trajectory
     string to_string() {
         string s = "";
         for(uint32_t t = 0; t < traj.size() - 1; t++) {

@@ -8,6 +8,7 @@ using namespace SETTINGS;
 // Helper functions
 const uint numHA = HA_Labels.size();
 
+// Returns the name of the HA
 string print(HA ha){
     return HA_Labels[ha];
 }
