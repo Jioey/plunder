@@ -102,11 +102,26 @@ double runFilter(vector<vector<HA>>& trajectories, int N, int M, Trajectory& tra
     srand(0);
     ParticleFilter pf (traj, asp, &sampleInitialHA, &obs_likelihood_given_model);
     resampCount = 0;
+
+    cout << "Printing pre-filter trajectory 0..." << endl;
+    for (int j = 0; j < traj.size(); j++)
+    {
+        cout << traj.get(j).to_string() <<  ", ";
+    }
+    cout << endl;    
     
     // Run particle filter
     double obs_likelihood = pf.forwardFilter(N);
 
     pf.retrieveTrajectories(trajectories, M);
+
+    cout << "Printing post-filter trajectory 0..." << endl;
+    for (int j = 0; j < trajectories[0].size(); j++)
+    {
+        cout << trajectories[0][j] << ", ";
+    }
+    cout << endl;
+    
 
     if(DEBUG)
         cout << "resample count: " << resampCount << endl;
@@ -132,6 +147,7 @@ double filterFromFile(vector<vector<HA>>& trajectories, int N, int M, string inp
         readData(inputFile, traj);
     }
 
+    // traj是打好标签的，trajectories是空的
     double obs_likelihood = runFilter(trajectories, N, M, traj, asp);
 
     // Write results (filter与sample完的action labels)

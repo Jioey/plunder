@@ -21,10 +21,10 @@ namespace std {
 }
 
 /**
- * @brief Convert transition to EMDIPS-compatible Example
+ * @brief Combines a label and its *resulting* state into an EMDIPS-compatible Example object
  * 
  * @param ha Action label
- * @param state State's observations
+ * @param state The resulting observations from the action
  * @return Example 
  */
 Example dataToExample(HA ha, Obs state){
@@ -120,7 +120,7 @@ void print_metrics(double cum_log_obs, double ha_correct, double t_total, DATATY
 }
 
 /**
- * @brief 
+ * @brief Compares current ASP's predictions to ground truth data from validation sets
  * 
  * @param traj Current trajectory
  * @param asp Current ASP policy
@@ -163,7 +163,7 @@ double save_pure(Trajectory traj, asp* asp, string output_path, double& ha_corre
             for(string each: LA_vars) {
                 (*la_files[each]) << la.get(each) << ",";
             }
-        } //// 
+        }
 
         Obs la = motorModel(traj.get(traj.size()-1), false);
         for(string each: LA_vars) {
@@ -241,7 +241,7 @@ vector<vector<Example>> expectation(uint iteration, vector<Trajectory>& state_tr
     }
 
     // 以下都是print logs
-    cout << "\n"
+    cout << "\n";
     print_metrics(cum_log_obs, ha_correct, ha_total, TRAINING); // cum_log_obs results from particle filter
     
     ha_correct = ha_total = cum_log_obs = 0; // resets the variables
@@ -253,7 +253,7 @@ vector<vector<Example>> expectation(uint iteration, vector<Trajectory>& state_tr
         }
 
         string plot = VALIDATION_TRAJ+to_string(iteration)+"-"+to_string(i);
-        cum_log_obs += save_pure(state_traj[i], asp, plot, ha_correct, ha_total);
+        cum_log_obs += save_pure(state_traj[i], asp, plot, ha_correct, ha_total); // 对比了生成的asp和ground truth
     }
     print_metrics(cum_log_obs, ha_correct, ha_total, VALIDATION);
 
@@ -281,12 +281,13 @@ void maximization(vector<vector<Example>>& allExamples, uint iteration){
     filesystem::create_directory(aspFilePath);
 
     vector<ast_ptr> inputs; vector<Signature> sigs;
-    vector<ast_ptr> ops = AST::RecEnumerate(roots, inputs, samples, library, BASE_FEAT_DEPTH, &sigs);
+    vector<ast_ptr> ops = AST::RecEnumerate(roots, inputs, samples, library, BASE_FEAT_DEPTH, &sigs); // enumerates ASP operations into AST
     if (iteration % STRUCT_CHANGE_FREQ != 0) {
         // Don't enumerate: only optimize current sketch
         ops.clear();
     }
 
+    // prints the number and first few of the ASP operations
     cout << "---- Number of Features Enumerated ----" << endl;
     cout << ops.size() << endl << endl;
     for(int i = 0; i < min(5, (int) ops.size()); i++){
@@ -301,7 +302,7 @@ void maximization(vector<vector<Example>>& allExamples, uint iteration){
         ldipsL3(samples, transitions, solution_preds, loss, ops, aspFilePath);
     }
 
-    // Write ASP info to file
+    // Write the ASP, represented as an AST, to a readable text format
     ofstream aspStrFile;
     string aspStrFilePath = GEN_ASP + to_string(iteration) + "/asp.txt";
     aspStrFile.open(aspStrFilePath);
@@ -408,8 +409,9 @@ void read_demonstration(vector<Trajectory>& state_traj){
             ha_correct = ha_total = cum_log_obs = 0;
         }
         
+        // validates and counts accuracy for the newly generated asp
         string plot = VALIDATION_TRAJ+"gt-"+to_string(i);
-        cum_log_obs += save_pure(state_traj[i], ASP_model, plot, ha_correct, ha_total);
+        cum_log_obs += save_pure(state_traj[i], ASP_model, plot, ha_correct, ha_total); 
     }
     print_metrics(cum_log_obs, ha_correct, ha_total, VALIDATION); // print validation log
 }

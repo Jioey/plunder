@@ -226,9 +226,9 @@ def plotSingleLA(inF, outP, gtF, iter, robot):
             axs[name].legend(handles=handles, loc='upper right')
 
             for tick in axs[name].xaxis.get_major_ticks():
-                tick.label.set_fontsize(15)
+                tick.label1.set_fontsize(15)
             for tick in axs[name].yaxis.get_major_ticks():
-                tick.label.set_fontsize(15)
+                tick.label1.set_fontsize(15)
 
     fig.tight_layout()
     plt.grid(linestyle='dotted')
@@ -365,8 +365,8 @@ def main():
                     }
 
         for iter in range(int(settings["NUM_ITER"])):
-            print("Plotting training graphs, iteration " + str(iter))
-            plotSingleTimestep(graph1['inF'], graph1['outP'], graph1['gtF'], graph1['title'], iter, int(settings["TRAINING_SET"]))
+            # print("Plotting training graphs, iteration " + str(iter))
+            # plotSingleTimestep(graph1['inF'], graph1['outP'], graph1['gtF'], graph1['title'], iter, int(settings["TRAINING_SET"]))
             print("Plotting testing ASP graphs, iteration " + str(iter))
             plotSingleTimestep(graph2['inF'], graph2['outP'], graph2['gtF'], graph2['title'], iter, int(settings["VALIDATION_SET"]))
             print("Plotting likelihoods, iteration " + str(iter))

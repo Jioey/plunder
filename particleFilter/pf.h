@@ -38,7 +38,7 @@ vector<HA> systematicResample(vector<HA>& ha, vector<double>& weights, vector<in
             }
         }
 
-        vector<HA> haResampled(n, bestHA);
+        vector<HA> haResampled(n, bestHA); // 找不到定义。。。但我猜是生成了n个bestHA组成的列表
         return haResampled;
     }
 
@@ -71,7 +71,7 @@ public:
 
     Trajectory state_traj;    // Observed state sequence (is the i-th trajectory of state_traj in em.cpp's expectation() function)
     vector<vector<HA>> particles;   // Gives the high-level trajectories of each particle
-    vector<vector<int>> ancestors;  // Stores ancestors during resampling
+    vector<vector<int>> ancestors;  // Stores ancestors during resampling (unused, intended for non-greedy re-weighting method)
 
     asp* asp_pf;
     init* init_pf;
