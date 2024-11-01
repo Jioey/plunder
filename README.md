@@ -1,4 +1,5 @@
-This is the forked repo I worked with during my time as Research Assitant Intern at Fudan University, it includes comments I wrote to further understand and document the project.
+**This is the forked repo I worked with during my time as Research Assitant Intern at Fudan University, it includes comments I wrote to further understand and document the project.**
+**The following is the original README:**
 
 # PLUNDER: Probabilistic Program Synthesis for Learning from Unlabeled and Noisy Demonstrations
 
